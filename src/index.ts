@@ -213,7 +213,7 @@ async function handleGet(pathname: string, env: Env) {
     return new Response(rawContent, {
       status: 200,
       headers: {
-        "Content-Type": "application/javascript; charset=utf-8",
+        "Content-Type": "application/typescript; charset=utf-8",
         "Cache-Control": "public, max-age=86400",
       },
     });
