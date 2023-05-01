@@ -2,7 +2,7 @@ name = "registry"
 main = "src/index.ts"
 compatibility_date = "2023-05-01"
 node_compat = true
-
+account_id = "57a4f493ca68d7d5a005eef275dd3040"
 kv_namespaces = [
   { binding = "REGISTRY", id = "ca69ff4b1e2b4a6fb03d1318fbe787d6", preview_id = "ad7ce06018d1460b8ea1fbc661852700" }
 ]
