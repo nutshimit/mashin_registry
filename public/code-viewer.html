@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>HTML 5 Boilerplate</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css"
+    />
+  </head>
+  <body style="background-color: #0d1117">
+    <div class="mt-2 max-w-8xl mx-auto px-4 sm:px-6 md:px-8">
+      <h1
+        class="text-2xl font-bold underline text-white"
+        id="mashin-module-name"
+      ></h1>
+      <pre><code class="language-typescript" id="mashin-code">...</code></pre>
+    </div>
+
+    <script>
+      async function loadCode() {
+        const source = await fetch(window.location.href, {
+          mode: "cors",
+          headers: {
+            Accept: "application/typescript",
+          },
+        });
+        const sourceCode = await source.text();
+        const moduleName = source.headers.get("Mashin-Module-Name");
+        const moduleVersion = source.headers.get("Mashin-Module-Version");
+        const githubUrl = source.headers.get("Mashin-Github-Repository");
+        const sourceUrl = source.headers.get("Mashin-Github-Url");
+
+        document.getElementById("mashin-code").innerHTML = sourceCode;
+        document.getElementById(
+          "mashin-module-name"
+        ).innerHTML = `${moduleName}@${moduleVersion}`;
+
+        hljs.highlightAll();
+      }
+
+      loadCode();
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+  </body>
+</html>

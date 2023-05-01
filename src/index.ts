@@ -1,5 +1,12 @@
 import { Endpoints } from "@octokit/types";
 import { Octokit } from "octokit";
+import {
+  getAssetFromKV,
+  mapRequestToAsset,
+  serveSinglePageApp,
+} from "@cloudflare/kv-asset-handler";
+import manifestJSON from "__STATIC_CONTENT_MANIFEST";
+const assetManifest = JSON.parse(manifestJSON);
 
 const STD_OWNER = "nutshimit";
 type GithubRelease =
@@ -8,6 +15,7 @@ type GithubRelease =
 export interface Env {
   REGISTRY: KVNamespace;
   GITHUB_TOKEN: string;
+  __STATIC_CONTENT: any;
 }
 
 type ReleaseInfo = {
@@ -27,13 +35,17 @@ export default {
   async fetch(
     request: Request,
     env: Env,
-    _ctx: ExecutionContext
+    ctx: ExecutionContext
   ): Promise<Response> {
     try {
       const { pathname } = new URL(request.url);
+      const isMashinAgent =
+        request.headers.get("user-agent")?.includes("mashin") ||
+        request.headers.get("accept")?.includes("typescript") ||
+        false;
 
       if (request.method === "GET") {
-        return await handleGet(pathname, env);
+        return await handleGet(pathname, env, request, ctx, isMashinAgent);
       } else if (
         pathname.startsWith("/webhook/github") &&
         request.method === "POST"
@@ -178,7 +190,13 @@ async function addXRelease(
   );
 }
 
-async function handleGet(pathname: string, env: Env) {
+async function handleGet(
+  pathname: string,
+  env: Env,
+  request: Request,
+  ctx: ExecutionContext,
+  isMashinAgent: boolean
+): Promise<Response> {
   if (pathname === "/favicon.ico") {
     return new Response(null, { status: 200 });
   }
@@ -200,23 +218,47 @@ async function handleGet(pathname: string, env: Env) {
   const module = await env.REGISTRY.get(`${currentModule.name}@${version}`);
 
   if (module) {
-    const decodedModule = JSON.parse(module) as ReleaseInfo;
-    let moduleContent;
-    if (decodedModule.module.type === "std") {
-      const path = `${match[8]}.ts`;
-      const url = `${decodedModule.url}/${path}`;
-      moduleContent = await fetch(url);
+    if (isMashinAgent) {
+      const decodedModule = JSON.parse(module) as ReleaseInfo;
+      let sourceUrl;
+      if (decodedModule?.module?.type === "std") {
+        const path = `${match[8]}.ts`;
+        sourceUrl = `${decodedModule.url}/${path}`;
+      } else {
+        sourceUrl = decodedModule.url;
+      }
+      const moduleContent = await fetch(sourceUrl);
+      const rawContent = await moduleContent.text();
+      return new Response(rawContent, {
+        status: 200,
+        headers: {
+          "Mashin-Github-Url": sourceUrl,
+          "Mashin-Github-Repository": `https://github.com/${decodedModule.owner}/${decodedModule.repo}`,
+          "Mashin-Module-Name": `${decodedModule.module.name}`,
+          "Mashin-Module-Version": `${decodedModule.version}`,
+          "Content-Type": "application/typescript; charset=utf-8",
+          "Cache-Control": "public, max-age=86400",
+        },
+      });
     } else {
-      moduleContent = await fetch(decodedModule.url);
+      const customKeyModifier = (request: any) => {
+        return mapRequestToAsset(
+          new Request("https://mashin.run/code-viewer.html", request)
+        );
+      };
+
+      return await getAssetFromKV(
+        {
+          request,
+          waitUntil: ctx.waitUntil.bind(ctx),
+        },
+        {
+          mapRequestToAsset: customKeyModifier,
+          ASSET_MANIFEST: assetManifest,
+          ASSET_NAMESPACE: env.__STATIC_CONTENT,
+        }
+      );
     }
-    const rawContent = await moduleContent.text();
-    return new Response(rawContent, {
-      status: 200,
-      headers: {
-        "Content-Type": "application/typescript; charset=utf-8",
-        "Cache-Control": "public, max-age=86400",
-      },
-    });
   }
 
   return Response.redirect("https://github.com/nutshimit/mashin_registry", 307);
