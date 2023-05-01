@@ -36,7 +36,10 @@ export default {
         const match = pathname.match(regexPattern);
 
         if (!match) {
-          return new Response("Invalid path", { status: 400 });
+          return Response.redirect(
+            "https://github.com/nutshimit/mashin_registry",
+            307
+          );
         }
 
         const moduleName = match[1];
