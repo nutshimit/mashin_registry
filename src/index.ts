@@ -1,6 +1,7 @@
 import { Endpoints } from "@octokit/types";
 import { Octokit } from "octokit";
 
+const STD_OWNER = "nutshimit";
 type GithubRelease =
   Endpoints["GET /repos/{owner}/{repo}/releases/{release_id}"]["response"]["data"];
 
@@ -12,8 +13,14 @@ export interface Env {
 type ReleaseInfo = {
   owner: string;
   repo: string;
+  module: Module;
   version: string;
-  entrypoint: string;
+  url: string;
+};
+
+type Module = {
+  type: "x" | "std";
+  name: string;
 };
 
 export default {
@@ -26,50 +33,13 @@ export default {
       const { pathname } = new URL(request.url);
 
       if (request.method === "GET") {
-        if (pathname === "/favicon.ico") {
-          return new Response(null, { status: 200 });
-        }
-
-        const regexPattern =
-          /^\/([a-zA-Z0-9-_]+)@((0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)$/;
-
-        const match = pathname.match(regexPattern);
-
-        if (!match) {
-          return Response.redirect(
-            "https://github.com/nutshimit/mashin_registry",
-            307
-          );
-        }
-
-        const moduleName = match[1];
-        const version = match[2];
-
-        const module = await env.REGISTRY.get(`${moduleName}@${version}`);
-
-        if (module) {
-          const decodedModule = JSON.parse(module) as ReleaseInfo;
-          let moduleContent = await fetch(decodedModule.entrypoint);
-          let rawContent = await moduleContent.text();
-
-          return new Response(rawContent, {
-            status: 200,
-            headers: {
-              "Content-Type": "application/javascript; charset=utf-8",
-              "Cache-Control": "public, max-age=86400",
-            },
-          });
-        } else {
-          return new Response("Invalid module", { status: 404 });
-        }
+        return await handleGet(pathname, env);
       } else if (
         pathname.startsWith("/webhook/github") &&
         request.method === "POST"
       ) {
         const event = request.headers.get("X-GitHub-Event");
-        // FIXME: validate moduleName
-        const moduleName = pathname.replace("/webhook/github/", "");
-
+        const currentModule = moduleFromPath(pathname);
         const contentType = request.headers.get("content-type");
         if (
           event != null &&
@@ -77,47 +47,33 @@ export default {
           contentType.includes("application/json")
         ) {
           const json: any = await request.json();
-
           if (event === "ping") {
-            // check if its already exist
-            let foundRepo = await env.REGISTRY.get(moduleName);
-            if (!foundRepo) {
-              const octokit = new Octokit({ auth: env.GITHUB_TOKEN });
-              // extract all past releases
-              const release = await octokit.request(
-                "GET /repos/{owner}/{repo}/releases",
-                {
-                  owner: json.repository.owner.login,
-                  repo: json.repository.name,
-                }
-              );
-
-              release.data.forEach(async (release) => {
-                await addRelease(
-                  env,
-                  release,
-                  moduleName,
-                  json.repository.owner.login,
-                  json.repository.name
-                );
-              });
-
-              await env.REGISTRY.put(moduleName, "ACTIVE");
-              return new Response("Webhook init", { status: 200 });
-            } else {
-              return new Response("Name is already claimed", { status: 500 });
+            if (
+              currentModule.type === "std" &&
+              json.repository.owner.login !== STD_OWNER
+            ) {
+              throw new Error("Invalid std owner");
             }
+
+            return await handlePing(env, currentModule, {
+              owner: json.repository.owner.login,
+              repo: json.repository.name,
+            });
           } else if (event === "release") {
-            const foundRepo = await env.REGISTRY.get(moduleName);
+            const foundRepo = await env.REGISTRY.get(currentModule.name);
             const action = json.action;
             if (foundRepo && foundRepo === "ACTIVE" && action === "published") {
-              await addRelease(
-                env,
-                json.release,
-                moduleName,
-                json.repository.owner.login,
-                json.repository.name
-              );
+              if (
+                currentModule.type === "std" &&
+                json.repository.owner.login !== STD_OWNER
+              ) {
+                throw new Error("Invalid std owner");
+              }
+
+              await addRelease(env, json.release, currentModule, {
+                owner: json.repository.owner.login,
+                repo: json.repository.name,
+              });
               return new Response("Webhook release", { status: 200 });
             }
           }
@@ -136,9 +92,58 @@ export default {
 async function addRelease(
   env: Env,
   release: GithubRelease,
-  moduleName: string,
-  repoOwner: string,
-  repoName: string
+  module: Module,
+  repository: {
+    owner: string;
+    repo: string;
+  }
+) {
+  console.log("ADD MODULE", module.type);
+  switch (module.type) {
+    case "std":
+      await addStdRelease(env, release, module, repository);
+      break;
+    case "x":
+      await addXRelease(env, release, module, repository);
+      break;
+  }
+}
+
+async function addStdRelease(
+  env: Env,
+  release: GithubRelease,
+  module: Module,
+  repository: {
+    owner: string;
+    repo: string;
+  }
+) {
+  let version = release.tag_name;
+  if (version.startsWith("v")) {
+    version = version.slice(1);
+  }
+
+  let url = `https://raw.githubusercontent.com/${repository.owner}/${repository.repo}/${release.tag_name}`;
+
+  await env.REGISTRY.put(
+    `${module.name}@${version}`,
+    JSON.stringify({
+      version,
+      url,
+      module,
+      ...repository,
+    } as ReleaseInfo)
+  );
+}
+
+async function addXRelease(
+  env: Env,
+  release: GithubRelease,
+  module: Module,
+  repository: {
+    owner: string;
+    repo: string;
+  }
 ) {
   const isMashinRelease = release.assets.find(
     (asset) => asset.name.includes(".so") || asset.name.includes(".dll")
@@ -152,9 +157,9 @@ async function addRelease(
 
   // if `mod.ts` isnt in the release,
   // lets fallback to `https://raw.githubusercontent.com/{owner}/{repo}/{tag}/mod.ts`
-  let entrypoint = `https://raw.githubusercontent.com/${repoOwner}/${repoName}/${release.tag_name}/mod.ts`;
+  let url = `https://raw.githubusercontent.com/${repository.owner}/${repository.repo}/${release.tag_name}/mod.ts`;
   if (foundModule) {
-    entrypoint = foundModule.browser_download_url;
+    url = foundModule.browser_download_url;
   }
 
   let version = release.tag_name;
@@ -163,12 +168,105 @@ async function addRelease(
   }
 
   await env.REGISTRY.put(
-    `${moduleName}@${version}`,
+    `${module.name}@${version}`,
     JSON.stringify({
-      owner: repoOwner,
-      repo: repoName,
       version,
-      entrypoint,
-    })
+      url,
+      module,
+      ...repository,
+    } as ReleaseInfo)
   );
+}
+
+async function handleGet(pathname: string, env: Env) {
+  if (pathname === "/favicon.ico") {
+    return new Response(null, { status: 200 });
+  }
+
+  const regexPattern =
+    /^\/([a-zA-Z0-9-_]+)@((0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)+(?:\/(.*)\.ts)?$/;
+
+  const match = pathname.match(regexPattern);
+
+  if (!match) {
+    return Response.redirect(
+      "https://github.com/nutshimit/mashin_registry",
+      307
+    );
+  }
+
+  const currentModule = moduleFromName(match[1]);
+  const version = match[2];
+  const module = await env.REGISTRY.get(`${currentModule.name}@${version}`);
+
+  if (module) {
+    const decodedModule = JSON.parse(module) as ReleaseInfo;
+    let moduleContent;
+    if (decodedModule.module.type === "std") {
+      const path = `${match[8]}.ts`;
+      const url = `${decodedModule.url}/${path}`;
+      moduleContent = await fetch(url);
+    } else {
+      moduleContent = await fetch(decodedModule.url);
+    }
+    const rawContent = await moduleContent.text();
+    return new Response(rawContent, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/typescript; charset=utf-8",
+        "Cache-Control": "public, max-age=86400",
+      },
+    });
+  }
+
+  return Response.redirect("https://github.com/nutshimit/mashin_registry", 307);
+}
+
+async function handlePing(
+  env: Env,
+  module: Module,
+  repository: {
+    owner: string;
+    repo: string;
+  }
+) {
+  // check if its already exist
+  let foundRepo = await env.REGISTRY.get(module.name);
+  if (!foundRepo) {
+    const octokit = new Octokit({ auth: env.GITHUB_TOKEN });
+    // extract all past releases
+    const release = await octokit.request(
+      "GET /repos/{owner}/{repo}/releases",
+      repository
+    );
+
+    release.data.forEach(async (release) => {
+      await addRelease(env, release, module, repository);
+    });
+
+    await env.REGISTRY.put(module.name, "ACTIVE");
+  }
+
+  return new Response("Webhook ping", { status: 200 });
+}
+
+function moduleFromPath(pathname: string) {
+  const name = pathname.replace("/webhook/github/", "");
+  return moduleFromName(name);
+}
+
+function moduleFromName(name: string): Module {
+  if (name.startsWith("std")) {
+    return {
+      type: "std",
+      name,
+    };
+  }
+
+  // throw new Error("Invalid module");
+
+  return {
+    type: "x",
+    name,
+  };
 }
