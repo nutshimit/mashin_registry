@@ -29,10 +29,10 @@
           },
         });
         const sourceCode = await source.text();
-        const moduleName = source.headers.get("Mashin-Module-Name");
-        const moduleVersion = source.headers.get("Mashin-Module-Version");
-        const githubUrl = source.headers.get("Mashin-Github-Repository");
-        const sourceUrl = source.headers.get("Mashin-Github-Url");
+        const moduleName = source.headers.get("X-Mashin-Module-Name");
+        const moduleVersion = source.headers.get("X-Mashin-Module-Version");
+        const githubUrl = source.headers.get("X-Mashin-Github-Repository");
+        const sourceUrl = source.headers.get("X-Mashin-Github-Url");
 
         document.getElementById("mashin-code").innerHTML = sourceCode;
         document.getElementById(

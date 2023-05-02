@@ -26,6 +26,11 @@ type ReleaseInfo = {
   url: string;
 };
 
+type ModuleRelease = {
+  latest: string;
+  availables: string[];
+};
+
 type Module = {
   type: "x" | "std";
   name: string;
@@ -74,7 +79,7 @@ export default {
           } else if (event === "release") {
             const foundRepo = await env.REGISTRY.get(currentModule.name);
             const action = json.action;
-            if (foundRepo && foundRepo === "ACTIVE" && action === "published") {
+            if (foundRepo && action === "published") {
               if (
                 currentModule.type === "std" &&
                 json.repository.owner.login !== STD_OWNER
@@ -86,6 +91,13 @@ export default {
                 owner: json.repository.owner.login,
                 repo: json.repository.name,
               });
+
+              let version = json.release.tag_name;
+              if (version.startsWith("v")) {
+                version = version.slice(1);
+              }
+              await addModuleVersion(env, currentModule.name, version);
+
               return new Response("Webhook release", { status: 200 });
             }
           }
@@ -110,14 +122,23 @@ async function addRelease(
     repo: string;
   }
 ) {
-  console.log("ADD MODULE", module.type);
   switch (module.type) {
     case "std":
-      await addStdRelease(env, release, module, repository);
-      break;
+      return await addStdRelease(env, release, module, repository);
     case "x":
-      await addXRelease(env, release, module, repository);
-      break;
+      return await addXRelease(env, release, module, repository);
+  }
+}
+
+async function addModuleVersion(env: Env, module: string, version: string) {
+  const foundModule = await env.REGISTRY.get(module);
+  if (foundModule) {
+    const decodedModule = JSON.parse(foundModule) as ModuleRelease;
+    if (decodedModule.latest !== version) {
+      decodedModule.latest = version;
+      decodedModule.availables.push(version);
+      await env.REGISTRY.put(module, JSON.stringify(decodedModule));
+    }
   }
 }
 
@@ -146,6 +167,8 @@ async function addStdRelease(
       ...repository,
     } as ReleaseInfo)
   );
+
+  return true;
 }
 
 async function addXRelease(
@@ -162,7 +185,7 @@ async function addXRelease(
   );
 
   if (!isMashinRelease) {
-    return;
+    return false;
   }
 
   let foundModule = release.assets.find((asset) => asset.name === "mod.ts");
@@ -188,6 +211,8 @@ async function addXRelease(
       ...repository,
     } as ReleaseInfo)
   );
+
+  return true;
 }
 
 async function handleGet(
@@ -203,27 +228,65 @@ async function handleGet(
 
   const regexPattern =
     /^\/([a-zA-Z0-9-_]+)@((0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)+(?:\/(.*)\.ts)?$/;
+  let match = pathname.match(regexPattern);
 
-  const match = pathname.match(regexPattern);
+  let maybeModule: string | undefined;
+  let maybeVersion: string | undefined;
+  let maybePath: string | undefined;
 
   if (!match) {
+    const regexPattern = /^\/([a-zA-Z0-9-_]+)$/;
+    const maybeMatch = pathname.match(regexPattern);
+    if (maybeMatch) {
+      const maybeHaveModule = maybeMatch[1] as string;
+      const module = await env.REGISTRY.get(`${maybeHaveModule}`);
+      if (module) {
+        const decodedModule = JSON.parse(module) as ModuleRelease;
+        if (decodedModule.latest) {
+          const { hostname } = new URL(request.url);
+          return Response.redirect(
+            `https://${hostname}/${maybeHaveModule}@${decodedModule.latest}`,
+            307
+          );
+        }
+      }
+    } else {
+      const regexPattern = /^\/([a-zA-Z0-9-_]+).json$/;
+      const maybeMatch = pathname.match(regexPattern);
+      if (maybeMatch) {
+        const module = await env.REGISTRY.get(`${maybeMatch[1]}`);
+        if (module) {
+          const decodedModule = JSON.parse(module) as ModuleRelease;
+          return Response.json(decodedModule);
+        }
+      }
+    }
+  } else {
+    maybeModule = match[1];
+    maybeVersion = match[2];
+    maybePath = match[8];
+  }
+
+  if (!maybeModule || !maybeVersion) {
     return Response.redirect(
       "https://github.com/nutshimit/mashin_registry",
       307
     );
   }
 
-  const currentModule = moduleFromName(match[1]);
-  const version = match[2];
+  const currentModule = moduleFromName(maybeModule);
+  const version = maybeVersion;
   const module = await env.REGISTRY.get(`${currentModule.name}@${version}`);
 
   if (module) {
     if (isMashinAgent) {
       const decodedModule = JSON.parse(module) as ReleaseInfo;
       let sourceUrl;
-      if (decodedModule?.module?.type === "std") {
-        const path = `${match[8]}.ts`;
+      if (decodedModule?.module?.type === "std" && maybePath) {
+        const path = `${maybePath}.ts`;
         sourceUrl = `${decodedModule.url}/${path}`;
+      } else if (decodedModule?.module?.type === "std" && !maybePath) {
+        sourceUrl = `${decodedModule.url}/mod.ts`;
       } else {
         sourceUrl = decodedModule.url;
       }
@@ -232,28 +295,27 @@ async function handleGet(
       return new Response(rawContent, {
         status: 200,
         headers: {
-          "Mashin-Github-Url": sourceUrl,
-          "Mashin-Github-Repository": `https://github.com/${decodedModule.owner}/${decodedModule.repo}`,
-          "Mashin-Module-Name": `${decodedModule.module.name}`,
-          "Mashin-Module-Version": `${decodedModule.version}`,
+          "X-Mashin-Github-Url": sourceUrl,
+          "X-Mashin-Github-Repository": `https://github.com/${decodedModule.owner}/${decodedModule.repo}`,
+          "X-Mashin-Module-Name": `${decodedModule.module.name}`,
+          "X-Mashin-Module-Version": `${decodedModule.version}`,
           "Content-Type": "application/typescript; charset=utf-8",
           "Cache-Control": "public, max-age=86400",
         },
       });
     } else {
-      const customKeyModifier = (request: any) => {
-        return mapRequestToAsset(
-          new Request("https://mashin.run/code-viewer.html", request)
-        );
-      };
-
       return await getAssetFromKV(
         {
           request,
           waitUntil: ctx.waitUntil.bind(ctx),
         },
         {
-          mapRequestToAsset: customKeyModifier,
+          mapRequestToAsset: (request: any) => {
+            // force `code-viewer.html` to be served
+            return mapRequestToAsset(
+              new Request("https://mashin.run/code-viewer.html", request)
+            );
+          },
           ASSET_MANIFEST: assetManifest,
           ASSET_NAMESPACE: env.__STATIC_CONTENT,
         }
@@ -282,11 +344,34 @@ async function handlePing(
       repository
     );
 
-    release.data.forEach(async (release) => {
-      await addRelease(env, release, module, repository);
-    });
+    let foundLatest: string | undefined = undefined;
+    const availables: string[] = [];
+    for (const iterator of release.data) {
+      let isValidRelease = await addRelease(env, iterator, module, repository);
+      if (isValidRelease && foundLatest === undefined) {
+        foundLatest = iterator.tag_name;
+        if (foundLatest.startsWith("v")) {
+          foundLatest = foundLatest.slice(1);
+        }
+        availables.push(foundLatest);
+      } else if (isValidRelease) {
+        let version = iterator.tag_name;
+        if (version.startsWith("v")) {
+          version = version.slice(1);
+        }
+        availables.push(version);
+      }
+    }
 
-    await env.REGISTRY.put(module.name, "ACTIVE");
+    if (foundLatest) {
+      await env.REGISTRY.put(
+        module.name,
+        JSON.stringify({
+          latest: foundLatest,
+          availables,
+        } as ModuleRelease)
+      );
+    }
   }
 
   return new Response("Webhook ping", { status: 200 });
