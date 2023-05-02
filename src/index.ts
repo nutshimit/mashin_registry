@@ -44,10 +44,13 @@ export default {
   ): Promise<Response> {
     try {
       const { pathname } = new URL(request.url);
-      const isMashinAgent =
-        request.headers.get("user-agent")?.includes("mashin") ||
-        request.headers.get("accept")?.includes("typescript") ||
-        false;
+
+      let isMashinAgent = false;
+      if (request.headers.get("user-agent")?.includes("mashin")) {
+        isMashinAgent = true;
+      } else if (request.headers.get("accept")?.includes("typescript")) {
+        isMashinAgent = true;
+      }
 
       if (request.method === "GET") {
         return await handleGet(pathname, env, request, ctx, isMashinAgent);
