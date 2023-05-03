@@ -44,16 +44,8 @@ export default {
   ): Promise<Response> {
     try {
       const { pathname } = new URL(request.url);
-
-      let isMashinAgent = false;
-      if (request.headers.get("user-agent")?.includes("mashin")) {
-        isMashinAgent = true;
-      } else if (request.headers.get("accept")?.includes("typescript")) {
-        isMashinAgent = true;
-      }
-
       if (request.method === "GET") {
-        return await handleGet(pathname, env, request, ctx, isMashinAgent);
+        return await handleGet(pathname, env, request, ctx);
       } else if (
         pathname.startsWith("/webhook/github") &&
         request.method === "POST"
@@ -222,11 +214,19 @@ async function handleGet(
   pathname: string,
   env: Env,
   request: Request,
-  ctx: ExecutionContext,
-  isMashinAgent: boolean
+  ctx: ExecutionContext
 ): Promise<Response> {
   if (pathname === "/favicon.ico") {
     return new Response(null, { status: 200 });
+  }
+
+  let shouldRenderTS = false;
+  if (
+    request.headers.get("user-agent")?.includes("mashin") ||
+    request.headers.get("user-agent")?.includes("deno") ||
+    request.headers.get("accept")?.includes("typescript")
+  ) {
+    shouldRenderTS = true;
   }
 
   const regexPattern =
@@ -281,49 +281,47 @@ async function handleGet(
   const version = maybeVersion;
   const module = await env.REGISTRY.get(`${currentModule.name}@${version}`);
 
-  if (module) {
-    if (isMashinAgent) {
-      const decodedModule = JSON.parse(module) as ReleaseInfo;
-      let sourceUrl;
-      if (decodedModule?.module?.type === "std" && maybePath) {
-        const path = `${maybePath}.ts`;
-        sourceUrl = `${decodedModule.url}/${path}`;
-      } else if (decodedModule?.module?.type === "std" && !maybePath) {
-        sourceUrl = `${decodedModule.url}/mod.ts`;
-      } else {
-        sourceUrl = decodedModule.url;
-      }
-      const moduleContent = await fetch(sourceUrl);
-      const rawContent = await moduleContent.text();
-      return new Response(rawContent, {
-        status: 200,
-        headers: {
-          "X-Mashin-Github-Url": sourceUrl,
-          "X-Mashin-Github-Repository": `https://github.com/${decodedModule.owner}/${decodedModule.repo}`,
-          "X-Mashin-Module-Name": `${decodedModule.module.name}`,
-          "X-Mashin-Module-Version": `${decodedModule.version}`,
-          "Content-Type": "application/typescript; charset=utf-8",
-          "Cache-Control": "public, max-age=86400",
-        },
-      });
+  if (module && shouldRenderTS) {
+    const decodedModule = JSON.parse(module) as ReleaseInfo;
+    let sourceUrl;
+    if (decodedModule?.module?.type === "std" && maybePath) {
+      const path = `${maybePath}.ts`;
+      sourceUrl = `${decodedModule.url}/${path}`;
+    } else if (decodedModule?.module?.type === "std" && !maybePath) {
+      sourceUrl = `${decodedModule.url}/mod.ts`;
     } else {
-      return await getAssetFromKV(
-        {
-          request,
-          waitUntil: ctx.waitUntil.bind(ctx),
-        },
-        {
-          mapRequestToAsset: (request: any) => {
-            // force `code-viewer.html` to be served
-            return mapRequestToAsset(
-              new Request("https://mashin.run/code-viewer.html", request)
-            );
-          },
-          ASSET_MANIFEST: assetManifest,
-          ASSET_NAMESPACE: env.__STATIC_CONTENT,
-        }
-      );
+      sourceUrl = decodedModule.url;
     }
+    const moduleContent = await fetch(sourceUrl);
+    const rawContent = await moduleContent.text();
+    return new Response(rawContent, {
+      status: 200,
+      headers: {
+        "X-Mashin-Github-Url": sourceUrl,
+        "X-Mashin-Github-Repository": `https://github.com/${decodedModule.owner}/${decodedModule.repo}`,
+        "X-Mashin-Module-Name": `${decodedModule.module.name}`,
+        "X-Mashin-Module-Version": `${decodedModule.version}`,
+        "Content-Type": "application/typescript; charset=utf-8",
+        "Cache-Control": "public, max-age=86400",
+      },
+    });
+  } else if (module) {
+    return await getAssetFromKV(
+      {
+        request,
+        waitUntil: ctx.waitUntil.bind(ctx),
+      },
+      {
+        mapRequestToAsset: (request: any) => {
+          // force `code-viewer.html` to be served
+          return mapRequestToAsset(
+            new Request("https://mashin.run/code-viewer.html", request)
+          );
+        },
+        ASSET_MANIFEST: assetManifest,
+        ASSET_NAMESPACE: env.__STATIC_CONTENT,
+      }
+    );
   }
 
   return Response.redirect("https://github.com/nutshimit/mashin_registry", 307);
