@@ -222,9 +222,9 @@ async function handleGet(
 
   let shouldRenderTS = false;
   if (
-    request.headers.get("user-agent")?.includes("mashin") ||
-    request.headers.get("user-agent")?.includes("deno") ||
-    request.headers.get("accept")?.includes("typescript")
+    request.headers.get("user-agent")?.toLowerCase().includes("mashin") ||
+    request.headers.get("user-agent")?.toLowerCase().includes("deno") ||
+    request.headers.get("accept")?.toLowerCase().includes("typescript")
   ) {
     shouldRenderTS = true;
   }
