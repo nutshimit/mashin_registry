@@ -3,7 +3,7 @@
 This Cloudflare Worker acts as a registry for Mashin, allowing users to easily import custom providers using a simple URL scheme. Users can import providers like this:
 
 ```ts
-import * as mysql from "https://mashin.run/mysql@0.1.1";
+import * as mysql from "https://mashin.run/mysql@0.1.1/mod.ts";
 ```
 
 ## Publishing a Module to the Registry

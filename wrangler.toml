@@ -1,11 +1,27 @@
 name = "registry"
-main = "src/index.ts"
+main = "src/workers/server.ts"
 compatibility_date = "2023-05-01"
-node_compat = true
 account_id = "57a4f493ca68d7d5a005eef275dd3040"
-kv_namespaces = [
-  { binding = "REGISTRY", id = "ca69ff4b1e2b4a6fb03d1318fbe787d6", preview_id = "ad7ce06018d1460b8ea1fbc661852700" }
-]
+
+[[r2_buckets]]
+binding = 'MASHIN_CDN'
+bucket_name = 'mashin-cdn'
+preview_bucket_name = "mashin-cdn-dev"
+
+[[ d1_databases ]]
+binding = "REGISTRY_SQL"
+database_name = "mashin-registry"
+database_id = "399ca66b-5846-4a0a-abc4-da35a33bdfdf"
+preview_database_id = "8e0c117c-0dc9-4984-a524-30e4c8b9dfac"
+
+[[queues.producers]]
+queue = "mashin-queue"
+binding = "REGISTRY_QUEUE"
+
+[[queues.consumers]]
+queue = "mashin-queue"
+max_batch_size = 20
+max_batch_timeout = 30
 
 [site]
-bucket = "./public"
+bucket = "./site"
