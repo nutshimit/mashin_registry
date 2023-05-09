@@ -9,7 +9,13 @@ import {
   setBuildSuccess,
   setModuleLastVersion,
 } from "./d1";
-import { ApiModuleData, Build } from "./types";
+import {
+  ApiModuleData,
+  Build,
+  FileExample,
+  FileReadme,
+  FileType,
+} from "./types";
 import { parseSemVer } from "semver-parser";
 import JSZip from "jszip";
 
@@ -67,12 +73,18 @@ export async function processBuildStd(
       return;
     }
 
-    const readme = await syncZipReleaseToR2(
+    const allImportantFiles = await syncZipReleaseToR2(
       env,
       module.owner,
       module.repo,
       build.version
     );
+
+    const readme = (
+      allImportantFiles.find((f) => f.kind === "readme") as
+        | FileReadme
+        | undefined
+    )?.value;
 
     const readmeText = readme ? new TextDecoder().decode(readme) : null;
     const versionId = await createVersion(
@@ -101,14 +113,14 @@ async function syncZipReleaseToR2(
   owner: string,
   repo: string,
   version: string
-) {
+): Promise<FileType[]> {
   const download = await fetch(
     `https://github.com/${owner}/${repo}/archive/refs/tags/${version}.zip`
   );
 
   const zip = new JSZip();
   const data = await zip.loadAsync(await download.arrayBuffer());
-  let readme: Uint8Array | undefined = undefined;
+  const results: FileType[] = [];
 
   for await (const relativePath of Object.keys(data.files)) {
     const file = data.files[relativePath];
@@ -118,8 +130,10 @@ async function syncZipReleaseToR2(
       file.name.endsWith("LICENSE") ||
       file.name.endsWith("README")
     ) {
-      const res = await file.async("uint8array");
-      await env.MASHIN_CDN.put(`${owner}/${relativePath}`, res);
+      const value = await file.async("uint8array");
+      await env.MASHIN_CDN.put(`${owner}/${relativePath}`, value);
+
+      file.unsafeOriginalName;
 
       let trimmedVersion = version;
       if (version.startsWith("v")) {
@@ -129,12 +143,27 @@ async function syncZipReleaseToR2(
         file.name === `${repo}-${trimmedVersion}/README` ||
         file.name === `${repo}-${trimmedVersion}/README.md`
       ) {
-        readme = res;
+        results.push({
+          kind: "readme",
+          value,
+        });
+      }
+
+      if (file.name.startsWith(`${repo}-${trimmedVersion}/examples`)) {
+        results.push({
+          kind: "example",
+          value,
+          // take `mashin_provider_starter-0.1.2/examples/database.ts`
+          // and turn it into `database`
+          resource: file.name
+            .slice(`${repo}-${trimmedVersion}/examples/`.length)
+            .replace(".ts", ""),
+        });
       }
     }
   }
 
-  return readme;
+  return results;
 }
 
 export async function processBuildProvider(
@@ -198,14 +227,19 @@ export async function processBuildProvider(
     }
 
     const entrypoint = "mod.ts";
-    const finalDoc = generateDocs(doc);
 
-    const readme = await syncZipReleaseToR2(
+    const allImportantFiles = await syncZipReleaseToR2(
       env,
       module.owner,
       module.repo,
       build.version
     );
+
+    const allExamples = allImportantFiles.filter(
+      (f) => f.kind === "example"
+    ) as FileExample[];
+
+    const finalDoc = generateDocs(doc, allExamples);
 
     // if `mod.ts` is in the release, we should overwrite it
     let foundModule = build.assets.find((asset) => asset.name === "mod.ts");
@@ -217,6 +251,12 @@ export async function processBuildProvider(
         res
       );
     }
+
+    const readme = (
+      allImportantFiles.find((f) => f.kind === "readme") as
+        | FileReadme
+        | undefined
+    )?.value;
 
     const readmeText = readme ? new TextDecoder().decode(readme) : null;
     const versionId = await createVersion(

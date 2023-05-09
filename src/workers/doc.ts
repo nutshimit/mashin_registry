@@ -10,6 +10,7 @@ import {
   DocPageModuleItem,
   DocPageProviderItem,
   DocPageResourceItem,
+  FileExample,
 } from "./types";
 import { Env } from "./config";
 import { getModule, getModuleVersion } from "./d1";
@@ -108,15 +109,32 @@ function flattenTypeIfNeeded(typeDef: TsTypeDef | null) {
 
 function buildResources(
   resources: DocNodeClass[],
-  nodes: DocNode[]
+  nodes: DocNode[],
+  allExamples: FileExample[]
 ): DocPageResourceItem[] {
   return resources.map((resource) => {
     const output = extractResourceOutput(resource, nodes);
     const config = extractResourceConfig(resource, nodes);
+    // maybe we have an example (convert to snake case)
+    const resourceToSnake = resource.name
+      .replace(/\.?([A-Z])/g, function (_, y) {
+        return "_" + y.toLowerCase();
+      })
+      .replace(/^_/, "");
+
+    const maybeExample = allExamples.find(
+      (f) => f.resource === resourceToSnake
+    );
+
+    const example = maybeExample
+      ? new TextDecoder().decode(maybeExample.value)
+      : null;
+
     return {
       kind: "resource",
       name: resource.name,
       js_doc: resource.jsDoc,
+      example,
       params:
         config?.interfaceDef.properties.map((prop) => {
           if (prop.location) {
@@ -219,7 +237,10 @@ function extractResourceOutput(
   );
 }
 
-export function generateDocs(docNodes: DocNode[]): DocPageModuleItem[] {
+export function generateDocs(
+  docNodes: DocNode[],
+  allExamples: FileExample[]
+): DocPageModuleItem[] {
   const provider = findProvider(docNodes);
   const resources = filterResources(docNodes);
 
@@ -230,7 +251,9 @@ export function generateDocs(docNodes: DocNode[]): DocPageModuleItem[] {
   const config = extractProviderConfig(provider, docNodes);
 
   const finalProvider = buildProvider(provider, config);
-  const finalResources = resources ? buildResources(resources, docNodes) : [];
+  const finalResources = resources
+    ? buildResources(resources, docNodes, allExamples)
+    : [];
 
   return [finalProvider, ...finalResources];
 }

@@ -98,6 +98,7 @@ export interface DocPageResourceItem {
   js_doc: JsDoc | undefined;
   params: DocPageParam[];
   output: DocPageOutput[];
+  example: string | null;
 }
 
 export interface DocPageProviderItem {
@@ -117,4 +118,17 @@ export interface DocPageOutput {
   name: string;
   js_doc: JsDoc | null;
   ts_type: TsTypeDef | null;
+}
+
+export type FileType = FileReadme | FileExample;
+
+export interface FileReadme {
+  kind: "readme";
+  value: Uint8Array;
+}
+
+export interface FileExample {
+  kind: "example";
+  resource: string;
+  value: Uint8Array;
 }
