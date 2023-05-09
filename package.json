@@ -1,20 +1,45 @@
 {
   "name": "mashin_registry",
   "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm:dev:*\"",
+    "dev:client": "esbuild --watch --outdir=./site/assets --bundle src/app/client.tsx",
+    "dev:server": "wrangler dev --local --persist --live-reload src/workers/server.ts",
+    "dev:css": "tailwindcss -i ./src/app/mashin.css -o ./site/assets/mashin.css --watch",
+    "build:client": "yarn build:css && esbuild --minify --outdir=./site/assets --bundle src/app/client.tsx",
+    "build:css": "tailwindcss -i ./src/app/mashin.css -o ./site/assets/mashin.css",
+    "deploy": "yarn build:client && wrangler publish --minify src/workers/server.ts"
+  },
+  "dependencies": {
+    "heroicons": "^2.0.17",
+    "hono": "^3.1.8",
+    "jszip": "^3.10.1",
+    "marked": "^5.0.1",
+    "preact": "^10.13.2",
+    "preact-render-to-string": "^6.0.3",
+    "preactement": "^1.8.4",
+    "react-highlight": "^0.15.0",
+    "sanitize-html": "^2.10.0",
+    "semver-parser": "^4.1.4",
+    "uuid": "^9.0.0"
+  },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20230404.0",
     "@octokit/types": "^9.2.0",
+    "@types/dompurify": "^3.0.2",
+    "@types/markdown-it": "^12.2.3",
+    "@types/marked": "^4.3.0",
+    "@types/react-highlight": "^0.12.5",
+    "@types/sanitize-html": "^2.9.0",
+    "@types/uuid": "^9.0.1",
+    "better-sqlite3": "^8.3.0",
+    "concurrently": "^8.0.1",
+    "esbuild": "^0.17.18",
+    "punycode": "^2.3.0",
+    "tailwindcss": "^3.3.2",
     "typescript": "^5.0.4",
     "vitest": "^0.30.1",
     "wrangler": "2.17.0"
-  },
-  "private": true,
-  "scripts": {
-    "start": "wrangler dev",
-    "deploy": "wrangler publish",
-    "test": "vitest"
-  },
-  "dependencies": {
-    "octokit": "^2.0.14"
   }
 }
