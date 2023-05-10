@@ -38,7 +38,7 @@ export function codeHandler(
   return frontendHandler(
     "code",
     <Code
-      isCold={true}
+      isCold={isCold}
       rawCode={code}
       module={module}
       moduleVersion={moduleVersion}
@@ -57,7 +57,7 @@ export function moduleHandler(
 ) {
   return frontendHandler(
     "module",
-    <Module isCold={true} module={module} moduleVersion={moduleVersion} />,
+    <Module isCold={isCold} module={module} moduleVersion={moduleVersion} />,
     context
   );
 }
@@ -71,7 +71,7 @@ export function docHandler(
 ) {
   return frontendHandler(
     "doc",
-    <Doc isCold={true} module={module} moduleVersion={moduleVersion} />,
+    <Doc isCold={isCold} module={module} moduleVersion={moduleVersion} />,
     context
   );
 }

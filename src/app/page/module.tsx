@@ -9,6 +9,7 @@ import { Document, Github } from "../components/icons";
 import Module from "../components/module";
 import Code from "../components/code";
 import Card from "../components/card";
+import Footer from "../components/footer";
 
 export function ModulePage({
   isCold,
@@ -50,6 +51,7 @@ export function ModulePage({
           <Code code={readme} language="markdown" />
         </Card>
       </Module>
+      <Footer isCold={isCold} />
     </div>
   );
 }

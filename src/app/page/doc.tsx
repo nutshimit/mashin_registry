@@ -10,6 +10,7 @@ import Module from "../components/module";
 import Code, { RawMarkdown } from "../components/code";
 import Card from "../components/card";
 import { Inputs, Outputs } from "../components/args";
+import Footer from "../components/footer";
 
 export function DocPage({
   isCold,
@@ -57,7 +58,7 @@ export function DocPage({
           <Card
             header={
               <>
-                <div className="mr-auto px-4 py-3 flex items-center">
+                <div className="mr-auto px-2 py-3 flex items-center">
                   <h3 className="text-base font-semibold leading-6 lg:ml-2 text-sky-900">
                     Example
                   </h3>
@@ -70,7 +71,7 @@ export function DocPage({
               </>
             }
           >
-            <div className="text-xs">
+            <div className="px-2 text-xs">
               <Code
                 language="typescript"
                 code={`#!/usr/bin/env mashin run
@@ -142,7 +143,7 @@ const provider = ${provider.example}`}
                     <Card
                       header={
                         <>
-                          <div className="mr-auto px-4 py-3 flex items-center">
+                          <div className="px-2 mr-auto py-3 flex items-center">
                             <h3 className="text-sm font-normal leading-6 lg:ml-2 text-slate-900">
                               Example
                             </h3>
@@ -155,7 +156,7 @@ const provider = ${provider.example}`}
                         </>
                       }
                     >
-                      <div className="p-4 text-xs">
+                      <div className="px-2 text-xs">
                         <Code code={resource.example} language="typescript" />
                       </div>
                     </Card>
@@ -166,6 +167,7 @@ const provider = ${provider.example}`}
           );
         })}
       </Module>
+      <Footer isCold={isCold} />
     </div>
   );
 }
