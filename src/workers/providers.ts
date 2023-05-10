@@ -1,4 +1,3 @@
-import { Int, OpenAPIRoute, Query, Str } from "@cloudflare/itty-router-openapi";
 import { Env } from "./config";
 import { getModules, getModulesCount } from "./d1";
 import { Context } from "hono";

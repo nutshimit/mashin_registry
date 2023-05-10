@@ -1,4 +1,3 @@
-import { OpenAPIRoute, Str, Path } from "@cloudflare/itty-router-openapi";
 import { Env } from "./config";
 import { getModule, getModuleVersion } from "./d1";
 import { parseSemVer } from "semver-parser";
