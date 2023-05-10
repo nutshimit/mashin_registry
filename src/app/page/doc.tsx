@@ -6,7 +6,6 @@ import {
   DocPageResourceItem,
 } from "../../workers/types";
 import Nav from "../components/nav";
-import { Document } from "../components/icons";
 import Module from "../components/module";
 import Code, { RawMarkdown } from "../components/code";
 import Card from "../components/card";
@@ -50,19 +49,35 @@ export function DocPage({
         resources={resources}
         moduleVersion={moduleVersion}
       >
+        {provider?.js_doc?.doc && (
+          <RawMarkdown className="mb-4" code={provider.js_doc.doc} />
+        )}
+
         {provider?.example && (
           <Card
             header={
-              <div className="px-4 py-3 flex items-center">
-                <Document className="h-4 w-4 flex-none stroke-sky-500" />
-                <h3 className="text-base font-semibold leading-6  lg:ml-2 text-slate-900">
-                  Example
-                </h3>
-              </div>
+              <>
+                <div className="mr-auto px-4 py-3 flex items-center">
+                  <h3 className="text-base font-semibold leading-6 lg:ml-2 text-sky-900">
+                    Example
+                  </h3>
+                </div>
+                <div className="-mb-px px-4 py-3">
+                  <h3 className="text-base font-extralight leading-6 lg:ml-2 text-sky-700">
+                    MashinScript
+                  </h3>
+                </div>
+              </>
             }
           >
-            <div className="p-4 text-xs">
-              <Code language="typescript" code={provider.example} />
+            <div className="text-xs">
+              <Code
+                language="typescript"
+                code={`#!/usr/bin/env mashin run
+import * as ${module.name} from "https://mashin.run/${module.name}@${moduleVersion.version}/${moduleVersion.entrypoint}"
+
+const provider = ${provider.example}`}
+              />
             </div>
           </Card>
         )}
@@ -70,8 +85,7 @@ export function DocPage({
           className="mt-4"
           header={
             <div className="px-4 py-3 flex items-center">
-              <Document className="h-4 w-4 flex-none stroke-sky-500" />
-              <h3 className="text-base font-semibold leading-6  lg:ml-2 text-slate-900">
+              <h3 className="text-base font-semibold leading-6 lg:ml-2 text-sky-900">
                 Arguments
               </h3>
             </div>
@@ -102,7 +116,7 @@ export function DocPage({
 
                   {resource?.params && resource.params.length > 0 && (
                     <>
-                      <h3>Input</h3>
+                      <h3 className="text-slate-700">Arguments</h3>
                       <div className="p-4 text-xs">
                         <Inputs params={resource.params} />
                       </div>
@@ -116,7 +130,7 @@ export function DocPage({
 
                   {resource?.output && resource.output.length > 0 && (
                     <>
-                      <h3>Output</h3>
+                      <h3 className="text-sm text-slate-700">Output</h3>
                       <div className="p-4 text-xs">
                         <Outputs params={resource.output} />
                       </div>
@@ -127,11 +141,18 @@ export function DocPage({
                   {resource.example && (
                     <Card
                       header={
-                        <div className="px-4 py-2 flex items-center">
-                          <h3 className="text-sm font-semibold leading-6  lg:ml-2 text-slate-900">
-                            Example
-                          </h3>
-                        </div>
+                        <>
+                          <div className="mr-auto px-4 py-3 flex items-center">
+                            <h3 className="text-sm font-normal leading-6 lg:ml-2 text-slate-900">
+                              Example
+                            </h3>
+                          </div>
+                          <div className="-mb-px px-4 py-3">
+                            <h3 className="text-sm font-extralight leading-6 lg:ml-2 text-sky-700">
+                              MashinScript
+                            </h3>
+                          </div>
+                        </>
                       }
                     >
                       <div className="p-4 text-xs">

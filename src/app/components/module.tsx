@@ -90,6 +90,28 @@ export default function Module({
             );
           })}
         </ul>
+
+        <h4 className="mt-4">Versions</h4>
+        <ul>
+          {module.versions?.map((version) => {
+            const isLatest = version === module.latest_version;
+            return (
+              <li className="flex items-center space-x-2">
+                <a
+                  href={`/${module.name}@${version}`}
+                  className="text-sky-800 hover:text-sky-600"
+                >
+                  {version}{" "}
+                </a>
+                {isLatest && (
+                  <span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
+                    latest
+                  </span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
       </div>
 
       <div className="col-span-3 row-span-2 lg:row-end-2">{children}</div>
