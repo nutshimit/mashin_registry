@@ -9,6 +9,7 @@ import { Document, Github } from "../components/icons";
 import Module from "../components/module";
 import Code from "../components/code";
 import Card from "../components/card";
+import Footer from "../components/footer";
 
 export function CodePage({
   isCold,
@@ -74,6 +75,7 @@ export function CodePage({
           <Code code={rawCode} language={language} />
         </Card>
       </Module>
+      <Footer isCold={isCold} />
     </div>
   );
 }
