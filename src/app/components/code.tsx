@@ -43,3 +43,22 @@ export default function Code({
     </div>
   );
 }
+
+export function RawMarkdown({
+  code,
+  className,
+}: {
+  code: string;
+  className?: string;
+}) {
+  const finalCode = useMemo(() => {
+    return sanitize(marked.parse(code, { gfm: true }));
+  }, [code]);
+
+  return (
+    <div
+      className={className}
+      dangerouslySetInnerHTML={{ __html: finalCode }}
+    />
+  );
+}

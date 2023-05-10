@@ -8,8 +8,9 @@ import {
 import Nav from "../components/nav";
 import { Document } from "../components/icons";
 import Module from "../components/module";
-import Code from "../components/code";
+import Code, { RawMarkdown } from "../components/code";
 import Card from "../components/card";
+import { Inputs, Outputs } from "../components/args";
 
 export function DocPage({
   isCold,
@@ -41,27 +42,6 @@ export function DocPage({
     }
   }, [moduleVersion]);
 
-  const sampleParams = useMemo(() => {
-    if (moduleVersion.doc && provider) {
-      let toReturn: Record<string, any> = {};
-      provider.params.forEach((element) => {
-        switch (element.ts_type?.repr) {
-          case "number":
-            toReturn[element.name] = 1;
-            break;
-          case "string":
-            toReturn[element.name] = "text";
-            break;
-
-          default:
-            break;
-        }
-      });
-
-      return toReturn;
-    }
-  }, [moduleVersion, provider]);
-
   return (
     <div className="min-h-full">
       <Nav />
@@ -70,33 +50,22 @@ export function DocPage({
         resources={resources}
         moduleVersion={moduleVersion}
       >
-        <Card
-          header={
-            <div className="px-4 py-3 flex items-center">
-              <Document className="h-4 w-4 flex-none stroke-sky-500" />
-              <h3 className="text-base font-semibold leading-6  lg:ml-2 text-slate-900">
-                Example
-              </h3>
+        {provider?.example && (
+          <Card
+            header={
+              <div className="px-4 py-3 flex items-center">
+                <Document className="h-4 w-4 flex-none stroke-sky-500" />
+                <h3 className="text-base font-semibold leading-6  lg:ml-2 text-slate-900">
+                  Example
+                </h3>
+              </div>
+            }
+          >
+            <div className="p-4 text-xs">
+              <Code language="typescript" code={provider.example} />
             </div>
-          }
-        >
-          <div className="p-4 text-xs">
-            <Code
-              language="typescript"
-              code={`// import provider
-import * as ${module.name} from "https://mashin.run/${module.name}@${
-                moduleVersion.version
-              }/${moduleVersion.entrypoint}"
-
-// initialize provider
-const provider = new ${module.name}.Provider("uniqueName", ${JSON.stringify(
-                sampleParams,
-                null,
-                "\t"
-              )});`}
-            />
-          </div>
-        </Card>
+          </Card>
+        )}
         <Card
           className="mt-4"
           header={
@@ -109,26 +78,7 @@ const provider = new ${module.name}.Provider("uniqueName", ${JSON.stringify(
           }
         >
           <div className="p-4 text-xs">
-            <dl class="divide-y divide-gray-100">
-              {provider?.params.map((param) => {
-                return (
-                  <div class="px-4 py-2 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                    <dt class="text-sm font-medium leading-6 text-gray-900">
-                      {param.name}
-                      {!param.optional && (
-                        <span className="text-red-600">*</span>
-                      )}
-                      <div className="text-xs font-light">
-                        {param.ts_type?.repr}
-                      </div>
-                    </dt>
-                    <dd class="mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0">
-                      {param.js_doc?.doc || `No JSdoc found for ${param.name}.`}
-                    </dd>
-                  </div>
-                );
-              })}
-            </dl>
+            {provider?.params && <Inputs params={provider.params} />}
           </div>
         </Card>
 
@@ -140,76 +90,55 @@ const provider = new ${module.name}.Provider("uniqueName", ${JSON.stringify(
                 {resource.name}
               </h1>
 
-              <div className="grid grid-cols-1 items-start gap-x-16 gap-y-10 xl:max-w-none xl:grid-cols-2">
+              <div className="grid grid-cols-1 items-start gap-x-4 gap-y-10 xl:max-w-none xl:grid-cols-2">
                 <div className="[&>:first-child]:mt-0 [&>:last-child]:mb-0">
-                  <p className="font-light text-sm">{resource.js_doc?.doc}</p>
+                  <p className="font-light text-sm mb-4">
+                    {resource.js_doc?.doc ? (
+                      <RawMarkdown code={resource.js_doc.doc} />
+                    ) : (
+                      "No documentation found"
+                    )}
+                  </p>
+
+                  {resource?.params && resource.params.length > 0 && (
+                    <>
+                      <h3>Input</h3>
+                      <div className="p-4 text-xs">
+                        <Inputs params={resource.params} />
+                      </div>
+                    </>
+                  )}
+
+                  {resource?.params &&
+                    resource.params.length > 0 &&
+                    resource?.output &&
+                    resource.output.length > 0 && <hr className="mb-4" />}
+
+                  {resource?.output && resource.output.length > 0 && (
+                    <>
+                      <h3>Output</h3>
+                      <div className="p-4 text-xs">
+                        <Outputs params={resource.output} />
+                      </div>
+                    </>
+                  )}
                 </div>
                 <div className="[&>:first-child]:mt-0 [&>:last-child]:mb-0 xl:sticky xl:top-24">
-                  <Card
-                    header={
-                      <div className="px-4 py-2 flex items-center">
-                        <h3 className="text-sm font-semibold leading-6  lg:ml-2 text-slate-900">
-                          Input
-                        </h3>
+                  {resource.example && (
+                    <Card
+                      header={
+                        <div className="px-4 py-2 flex items-center">
+                          <h3 className="text-sm font-semibold leading-6  lg:ml-2 text-slate-900">
+                            Example
+                          </h3>
+                        </div>
+                      }
+                    >
+                      <div className="p-4 text-xs">
+                        <Code code={resource.example} language="typescript" />
                       </div>
-                    }
-                  >
-                    <div className="p-4 text-xs">
-                      <dl class="divide-y divide-gray-100">
-                        {resource.params.map((param) => {
-                          return (
-                            <div class="px-4 py-2 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                              <dt class="text-sm font-medium leading-6 text-gray-900">
-                                {param.name}
-                                {!param.optional && (
-                                  <span className="text-red-600">*</span>
-                                )}
-                                <div className="text-xs font-light">
-                                  {param.ts_type?.repr}
-                                </div>
-                              </dt>
-                              <dd class="mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0">
-                                {param.js_doc?.doc ||
-                                  `No JSdoc found for ${param.name}.`}
-                              </dd>
-                            </div>
-                          );
-                        })}
-                      </dl>
-                    </div>
-                  </Card>
-
-                  <Card
-                    className="mt-4"
-                    header={
-                      <div className="px-4 py-2 flex items-center">
-                        <h3 className="text-sm font-semibold leading-6  lg:ml-2 text-slate-900">
-                          Output
-                        </h3>
-                      </div>
-                    }
-                  >
-                    <div className="p-4 text-xs">
-                      <dl class="divide-y divide-gray-100">
-                        {resource.output.map((param) => {
-                          return (
-                            <div class="px-4 py-2 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                              <dt class="text-sm font-medium leading-6 text-gray-900">
-                                {param.name}
-                                <div className="text-xs font-light">
-                                  {param.ts_type?.repr}
-                                </div>
-                              </dt>
-                              <dd class="mt-1 text-sm leading-6 text-gray-700 sm:col-span-2 sm:mt-0">
-                                {param.js_doc?.doc ||
-                                  `No JSdoc found for ${param.name}.`}
-                              </dd>
-                            </div>
-                          );
-                        })}
-                      </dl>
-                    </div>
-                  </Card>
+                    </Card>
+                  )}
                 </div>
               </div>
             </>

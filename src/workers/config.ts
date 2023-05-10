@@ -4,4 +4,5 @@ export type Env = {
   MASHIN_CDN: R2Bucket;
   REGISTRY_SQL: D1Database;
   REGISTRY_QUEUE: Queue<Build>;
+  DISCORD_WEBHOOK_PUBLIC: string;
 };

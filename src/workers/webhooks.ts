@@ -1,22 +1,10 @@
-import {
-  OpenAPIRoute,
-  Path,
-  Query,
-  Str,
-} from "@cloudflare/itty-router-openapi";
 import { Env } from "./config";
 import {
   WebhookPayloadRelease,
   type WebhookPayloadPing,
-  WebhookPayloadCreate,
   PayloadReleaseAsset,
 } from "./webhooks.d";
-import {
-  ApiModuleData,
-  Build,
-  ModuleMetaVersionsJson,
-  ModuleType,
-} from "./types";
+import { ApiModuleData, Build, ModuleType } from "./types";
 import {
   createBuild,
   getModule,

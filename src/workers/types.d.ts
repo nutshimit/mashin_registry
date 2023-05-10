@@ -105,6 +105,7 @@ export interface DocPageProviderItem {
   kind: "provider";
   js_doc: JsDoc | undefined;
   params: DocPageParam[];
+  example: string | null;
 }
 
 export interface DocPageParam {

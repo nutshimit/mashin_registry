@@ -18,6 +18,7 @@ import {
 } from "./types";
 import { parseSemVer } from "semver-parser";
 import JSZip from "jszip";
+import { postVersion } from "./discord";
 
 export async function processBuild(env: Env, build: Build) {
   let module = await getModule(env.REGISTRY_SQL, build.module);
@@ -148,18 +149,6 @@ async function syncZipReleaseToR2(
           value,
         });
       }
-
-      if (file.name.startsWith(`${repo}-${trimmedVersion}/examples`)) {
-        results.push({
-          kind: "example",
-          value,
-          // take `mashin_provider_starter-0.1.2/examples/database.ts`
-          // and turn it into `database`
-          resource: file.name
-            .slice(`${repo}-${trimmedVersion}/examples/`.length)
-            .replace(".ts", ""),
-        });
-      }
     }
   }
 
@@ -235,11 +224,7 @@ export async function processBuildProvider(
       build.version
     );
 
-    const allExamples = allImportantFiles.filter(
-      (f) => f.kind === "example"
-    ) as FileExample[];
-
-    const finalDoc = generateDocs(doc, allExamples);
+    const finalDoc = generateDocs(doc, module);
 
     // if `mod.ts` is in the release, we should overwrite it
     let foundModule = build.assets.find((asset) => asset.name === "mod.ts");
@@ -275,6 +260,7 @@ export async function processBuildProvider(
 
     await setModuleLastVersion(env.REGISTRY_SQL, module.name, versionId);
     await setBuildSuccess(env.REGISTRY_SQL, build.id);
+    await postVersion(env, module, version);
   } catch (error: any) {
     await setBuildFailed(env.REGISTRY_SQL, build.id, error.message);
   }
