@@ -7,12 +7,14 @@ import { Env } from "../workers/config";
 import { VNode, hydrate } from "preact";
 import { define } from "preactement";
 import { ApiModuleData, ApiModuleVersion } from "../workers/types";
+import { IndexPage } from "./page/index";
 
 const Code = define("code", () => CodePage);
 const Module = define("module", () => ModulePage);
 const Doc = define("doc", () => DocPage);
+const Index = define("index", () => IndexPage);
 
-export type Page = "code" | "module" | "doc";
+export type Page = "code" | "module" | "doc" | "index";
 
 let isCold = true;
 
@@ -23,6 +25,8 @@ if (typeof document !== "undefined") {
     hydrate(Code, document.getElementById("root-code")!);
   } else if (document.getElementById("root-doc")) {
     hydrate(Doc, document.getElementById("root-doc")!);
+  } else if (document.getElementById("root-index")) {
+    hydrate(Index, document.getElementById("root-index")!);
   }
 }
 
@@ -76,6 +80,23 @@ export function docHandler(
   );
 }
 
+export function indexHandler(
+  context: Context<{
+    Bindings: Env;
+  }>
+) {
+  return frontendHandler(
+    "index",
+    <Index
+      appId={context.env.ALGOLIA_APP_ID}
+      apiKey={context.env.ALGOLIA_API_KEY}
+      indexName={context.env.ALGOLIA_INDEX_NAME}
+      isCold={isCold}
+    />,
+    context
+  );
+}
+
 function frontendHandler(
   pageName: Page,
   node: VNode<{}>,
@@ -105,9 +126,12 @@ function frontendHandler(
 
   return context.newResponse(
     `<!doctype html>
-      <html lang="en" class="h-full bg-gray-100">
+      <html lang="en" class="h-full ${
+        pageName === "index" ? "bg-white" : "bg-slate-100"
+      }">
       <head>
-        <title></title> 
+        <title>mashin.run: Mashin Provider Registry</title>
+        <meta name="description" content="mashin.run is the provider registry for mashin">
         <script type="module" src="/assets/client.js"></script>
         <script src="/assets/highlight.min.js"></script>
         <link rel="stylesheet" href="/assets/mashin.css" />

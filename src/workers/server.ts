@@ -12,6 +12,7 @@ import * as provider from "./provider";
 import * as lib from "./lib";
 import * as module from "./module";
 import * as doc from "./doc";
+import * as home from "./home";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -29,12 +30,23 @@ app.get("/api/v1/provider/:module/:version/doc", provider.getDoc);
 
 app.post("/api/v1/webhook/github/:module", webhooks.handle);
 
+// module@0.0.0/doc
 app.get("/:moduleName{[a-zA-Z0-9_]+@[0-9]+.[0-9]+.[0-9]+}/doc", doc.handle);
-app.get("/:moduleName{[a-zA-Z0-9_]+@[0-9]+.[0-9]+.[0-9]+/?}", module.handle);
+// module@latest/doc
+app.get("/:moduleName{[a-zA-Z0-9_]+@latest}/doc", doc.redirectLatest);
+// module
+app.get("/:moduleName{[a-zA-Z0-9_]+}", module.redirectLatest);
+// module@latest
+app.get("/:moduleName{[a-zA-Z0-9_]+@latest}", module.redirectLatest);
+// module@0.0.0
+app.get("/:moduleName{[a-zA-Z0-9_]+@[0-9]+.[0-9]+.[0-9]+}", module.handle);
+// module@0.0.0/{any-path/?}
 app.get(
   "/:moduleName{[a-zA-Z0-9_]+@[0-9]+.[0-9]+.[0-9]+}/:path{[^]*}",
   cdn.handle
 );
+
+app.get("/", home.handle);
 
 export default {
   fetch: app.fetch,

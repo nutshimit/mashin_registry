@@ -12,8 +12,11 @@
     "deploy": "yarn build:client && wrangler publish --minify src/workers/server.ts"
   },
   "dependencies": {
+    "@algolia/requester-fetch": "^4.17.0",
+    "algoliasearch": "^4.17.0",
     "heroicons": "^2.0.17",
     "hono": "^3.1.8",
+    "instantsearch.js": "^4.55.0",
     "jszip": "^3.10.1",
     "marked": "^5.0.1",
     "preact": "^10.13.2",

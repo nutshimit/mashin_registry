@@ -19,6 +19,8 @@ import {
 import { parseSemVer } from "semver-parser";
 import JSZip from "jszip";
 import { postVersion } from "./discord";
+import algoliasearch from "algoliasearch";
+import { createFetchRequester } from "@algolia/requester-fetch";
 
 export async function processBuild(env: Env, build: Build) {
   let module = await getModule(env.REGISTRY_SQL, build.module);
@@ -261,6 +263,26 @@ export async function processBuildProvider(
     await setModuleLastVersion(env.REGISTRY_SQL, module.name, versionId);
     await setBuildSuccess(env.REGISTRY_SQL, build.id);
     await postVersion(env, module, version);
+
+    // index to algolia
+    const client = algoliasearch(
+      env.ALGOLIA_APP_ID,
+      env.ALGOLIA_API_KEY_WRITE,
+      {
+        requester: createFetchRequester(),
+      }
+    );
+    const index = client.initIndex(env.ALGOLIA_INDEX_NAME);
+
+    await index.saveObject({
+      objectID: module.name,
+      name: module.name,
+      description: module.description,
+      type: module.type,
+      owner: module.owner,
+      repo: module.repo,
+      latest_version: version.version,
+    });
   } catch (error: any) {
     await setBuildFailed(env.REGISTRY_SQL, build.id, error.message);
   }
