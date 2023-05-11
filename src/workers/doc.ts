@@ -20,12 +20,35 @@ import { getModule, getModuleVersion } from "./d1";
 import { parseSemVer } from "semver-parser";
 import { docHandler } from "../app/client";
 
+export async function redirectLatest(
+  context: Context<{
+    Bindings: Env;
+  }>
+) {
+  const { moduleName } = context.req.param();
+  const [extractedName] = moduleName.split("@");
+  const module = await getModule(context.env.REGISTRY_SQL, extractedName);
+  if (module && module?.latest_version) {
+    return context.redirect(`/${module.name}@${module?.latest_version}/doc`);
+  }
+
+  return context.json(
+    {
+      success: false,
+      error: "file not found",
+    },
+    {
+      status: 404,
+    }
+  );
+}
+
 export async function handle(
   context: Context<{
     Bindings: Env;
   }>
 ) {
-  const { moduleName, path } = context.req.param();
+  const { moduleName } = context.req.param();
   const [extractedName, version] = moduleName.split("@");
   const module = await getModule(context.env.REGISTRY_SQL, extractedName);
   if (module) {
